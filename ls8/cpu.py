@@ -11,13 +11,13 @@ class CPU:
         """Construct a new CPU."""
         self.ram = [0] * 256
         self.reg = [0x00] * 8
-        self.reg[7] = self.ram[int('0xf4', 16)]
-        self.sc = self.reg[7]
+        self.sp = 0xf4
         self.pc = 0x00
         self.ir = 0x00
         self.mar = 0x00
         self.mdr = 0x00
         self.fl = 0x00
+        self.heap_height = 0
         self.op_map = {1: {0: {0b0000: 'ADD',
                                0b1000: 'AND',
                                0b0111: 'CMP',
@@ -67,14 +67,13 @@ class CPU:
         if args:
             file = os.path.join(args[0])
             with open(file, 'r') as f:
-                i = 0
                 for line in f:
                     line = line.split('#')[0].strip()
                     # print('l', line)
                     if line == '':
                         continue
-                    self.ram[i] = f'{int(line, 2):08b}'
-                    i += 1
+                    self.ram[self.heap_height] = f'{int(line, 2):08b}'
+                    self.heap_height += 1
         else:
             raise ValueError('No program file provided.')
 
@@ -86,7 +85,7 @@ class CPU:
             arg_1 = int(args[0], 2)
 
         if op == 'PRN':
-            print(int(self.reg[arg_1], 2), end='')
+            print(int(self.reg[arg_1], 2), end='\n')
 
         elif op == 'PRA':
             address = int(self.reg[arg_1], 2)
@@ -103,21 +102,24 @@ class CPU:
             self.reg[arg_1] = self.reg[arg_2]
 
         elif op == 'PUSH':
-            self.sc -= 1
-            self.ram[self.sc] = self.reg[arg_1]
+            self.sp -= 1
+            # print(self.sp, self.heap_height)
+            if self.sp <= self.heap_height:
+                raise IndexError('Stack Overflow')
+            self.ram[self.sp] = self.reg[arg_1]
 
         elif op == 'POP':
-            self.reg[arg_1] = self.ram[self.sc]
-            self.sc += 1
+            self.reg[arg_1] = self.ram[self.sp]
+            self.sp += 1
 
         elif op == 'CALL':
-            self.ram[self.sc] = self.ram[self.pc + 1]
-            self.sc -= 1
+            self.sp -= 1
+            self.ram[self.sp] = self.pc + 1
             self.pc = int(self.reg[arg_1], 2)
 
         elif op == 'RET':
-            self.pc = self.ram[self.sc]
-            self.sc += 1
+            self.pc = self.ram[self.sp]
+            self.sp += 1
 
         elif op == 'NOP':
             pass
@@ -272,7 +274,7 @@ class CPU:
             adv_pc = _adv_pc >> 4
             instruction = self.ir & 0b00001111
             args = []
-            
+
             for _ in range(_bytes):
                 self.pc += 1
                 args.append(self.ram_read(self.pc))
