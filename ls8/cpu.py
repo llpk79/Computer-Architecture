@@ -13,47 +13,47 @@ class CPU:
         self.reg = [0x00] * 8
         self.sp = 0xf4
         self.pc = 0x00
-        self.ir = 0x00
-        self.mar = 0x00
-        self.mdr = 0x00
         self.fl = 0x00
         self.heap_height = 0
-        self.op_map = {1: {0: {0b0000: 'ADD',
-                               0b1000: 'AND',
-                               0b0111: 'CMP',
-                               0b0110: 'DEC',
-                               0b0011: 'DEV',
-                               0b0101: 'INC',
-                               0b0100: 'MOD',
-                               0b0010: 'MUL',
-                               0b1001: 'NOT',
-                               0b1010: 'OR',
-                               0b1100: 'SHL',
-                               0b1101: 'SHR',
-                               0b0001: 'SUB',
-                               0b1011: 'XOR',
+        self.arg_1 = 0xf7
+        self.arg_2 = 0xf6
+
+        self.op_map = {1: {0: {0b0000: self.ADD,
+                               0b1000: self.AND,
+                               0b0111: self.CMP,
+                               0b0110: self.DEC,
+                               0b0011: self.DIV,
+                               0b0101: self.INC,
+                               0b0100: self.MOD,
+                               0b0010: self.MUL,
+                               0b1001: self.NOT,
+                               0b1010: self.OR,
+                               0b1100: self.SHL,
+                               0b1101: self.SHR,
+                               0b0001: self.SUB,
+                               0b1011: self.XOR,
                                }},
-                       0: {1: {0b0000: 'CALL',
-                               0b0010: 'INT',
-                               0b0011: 'IRET',
-                               0b0101: 'JEQ',
-                               0b1010: 'JGE',
-                               0b0111: 'JGT',
-                               0b1001: 'JLE',
-                               0b1000: 'JLT',
-                               0b0100: 'JMP',
-                               0b0110: 'JNE',
-                               0b0001: 'RET',
+                       0: {1: {0b0000: self.CALL,
+                               0b0010: self.INT,
+                               0b0011: self.IRET,
+                               0b0101: self.JEQ,
+                               0b1010: self.JGE,
+                               0b0111: self.JGT,
+                               0b1001: self.JLE,
+                               0b1000: self.JLT,
+                               0b0100: self.JMP,
+                               0b0110: self.JNE,
+                               0b0001: self.RET,
                                },
-                           0: {0b0001: 'HLT',
-                               0b0011: 'LD',
-                               0b0010: 'LDI',
-                               0b0000: 'NOP',
-                               0b0110: 'POP',
-                               0b1000: 'PRA',
-                               0b0111: 'PRN',
-                               0b0101: 'PUSH',
-                               0b0100: 'ST',
+                           0: {0b0001: self.HLT,
+                               0b0011: self.LD,
+                               0b0010: self.LDI,
+                               0b0000: self.NOP,
+                               0b0110: self.POP,
+                               0b1000: self.PRA,
+                               0b0111: self.PRN,
+                               0b0101: self.PUSH,
+                               0b0100: self.ST,
                                }
                            }
                        }
@@ -77,168 +77,162 @@ class CPU:
         else:
             raise ValueError('No program file provided.')
 
-    def not_alu(self, op, *args):
-        """Not ALU operations."""
-        if len(args) > 1:
-            arg_1, arg_2 = int(args[0], 2), int(args[1], 2)
-        elif len(args):
-            arg_1 = int(args[0], 2)
+    def first(self):
+        return self.ram_read(self.arg_1)
 
-        if op == 'PRN':
-            print(int(self.reg[arg_1], 2), end='\n')
+    def second(self):
+        return self.ram_read(self.arg_2)
 
-        elif op == 'PRA':
-            address = int(self.reg[arg_1], 2)
-            letter = self.ram[address]
-            print(chr(int(letter, 2)), end='')
+    def PRN(self):
+        print(int(self.reg[int(self.first(), 2)], 2), end='\n')
 
-        elif op == 'LDI':
-            self.reg[arg_1] = args[1]
+    def PRA(self):
+        address = int(self.reg[int(self.first(), 2)], 2)
+        letter = self.ram[address]
+        print(chr(int(letter, 2)), end='')
 
-        elif op == 'HLT':
-            self.exit()
+    def LDI(self):
+        self.reg[int(self.first(), 2)] = self.second()
 
-        elif op == 'LD':
-            self.reg[arg_1] = self.reg[arg_2]
+    def HLT(self):
+        self.exit()
 
-        elif op == 'PUSH':
-            self.sp -= 1
-            # print(self.sp, self.heap_height)
-            if self.sp <= self.heap_height:
-                raise IndexError('Stack Overflow')
-            self.ram[self.sp] = self.reg[arg_1]
+    def LD(self):
+        self.reg[int(self.first(), 2)] = self.reg[int(self.second(), 2)]
 
-        elif op == 'POP':
-            self.reg[arg_1] = self.ram[self.sp]
-            self.sp += 1
+    def PUSH(self):
+        self.sp -= 1
+        if self.sp <= self.heap_height:
+            raise IndexError('Stack Overflow')
+        self.ram[self.sp] = self.reg[int(self.first(), 2)]
 
-        elif op == 'CALL':
-            self.sp -= 1
-            self.ram[self.sp] = self.pc + 1
-            self.pc = int(self.reg[arg_1], 2)
+    def POP(self):
+        self.reg[int(self.first(), 2)] = self.ram[self.sp]
+        self.sp += 1
 
-        elif op == 'RET':
-            self.pc = self.ram[self.sp]
-            self.sp += 1
+    def CALL(self):
+        self.sp -= 1
+        self.ram[self.sp] = self.pc + 1
+        self.pc = int(self.reg[int(self.first(), 2)], 2)
 
-        elif op == 'NOP':
-            pass
+    def RET(self):
+        self.pc = self.ram[self.sp]
+        self.sp += 1
 
-        elif op == 'JMP':
-            self.pc = int(self.reg[arg_1], 2)
+    def ST(self):
+        self.reg[self.first()] = self.second()
 
-        elif op == 'JEQ':
-            if self.fl & 1:
-                self.pc = int(self.reg[arg_1], 2)
-                # print('eq', self.pc)
-            else:
-                self.pc += 1
+    def INT(self):
+        pass
 
-        elif op == 'JNE':
-            if not self.fl & 1:
-                self.pc = int(self.reg[arg_1], 2)
-            else:
-                self.pc += 1
+    def IRET(self):
+        pass
 
-        elif op == 'JGT':
-            if self.fl & (1 << 1):
-                self.pc = int(self.reg[arg_1], 2)
-            else:
-                self.pc += 1
+    def NOP(self):
+        pass
 
-        elif op == 'JGE':
-            if self.fl & 1 or self.fl & (1 << 1):
-                self.pc = int(self.reg[arg_1], 2)
-            else:
-                self.pc += 1
+    def JMP(self):
+        self.pc = int(self.reg[int(self.first(), 2)], 2)
 
-        elif op == 'JLT':
-            if self.fl & (1 << 2):
-                self.pc = int(self.reg[arg_1], 2)
-            else:
-                self.pc += 1
-
-        elif op == 'JLE':
-            if self.fl & 1 or self.fl & (1 << 2):
-                self.pc = int(self.reg[arg_1], 2)
-            else:
-                self.pc += 1
-
+    def JEQ(self):
+        if self.fl & 1:
+            self.pc = int(self.reg[int(self.first(), 2)], 2)
         else:
-            raise ValueError(f'No such opperation exists {op}')
+            self.pc += 1
 
-    def alu(self, op, *args):
-        """ALU operations."""
-        if len(args) > 1:
-            arg_1, arg_2 = int(args[0], 2), int(args[1], 2)
+    def JNE(self):
+        if not self.fl & 1:
+            self.pc = int(self.reg[int(self.first(), 2)], 2)
         else:
-            arg_1 = int(args[0], 2)
+            self.pc += 1
 
-        if op == 'DEC':
-            self.reg[arg_1] = f'{int(self.reg[arg_1], 2) - 1:08b}'
-
-        elif op == "INC":
-            self.reg[arg_1] = f'{int(self.reg[arg_1], 2) + 1:08b}'
-
-        elif op == "ADD":
-            added = (int(self.reg[arg_1], 2) + int(self.reg[arg_2], 2)) & 0xff
-            self.reg[arg_1] = f'{added:08b}'
-
-        elif op == "SUB":
-            subbed = (int(self.reg[arg_1], 2) - int(self.reg[arg_2], 2)) * 0xff
-            self.reg[arg_1] = f'{subbed:08b}'
-
-        elif op == 'MUL':
-            mulled = (int(self.reg[arg_1], 2) * int(self.reg[arg_2], 2)) & 0xff
-            self.reg[arg_1] = f'{mulled:08b}'
-
-        elif op == 'DIV':
-            dived = (int(self.reg[arg_1], 2) >> int(self.reg[arg_2], 2)) & 0xff
-            self.reg[arg_1] = f'{dived:08b}'
-
-        elif op == 'MOD':
-            modded = (int(self.reg[arg_1], 2) % int(self.reg[arg_2], 2)) & 0xff
-            self.reg[arg_1] = f'{modded:08b}'
-
-        elif op == 'CMP':
-            comp_a, comp_b = int(self.reg[arg_1], 2), int(self.reg[arg_2], 2)
-            # print(comp_a, comp_b)
-            if comp_a == comp_b:
-                self.fl = self.fl & 0b00000001
-                self.fl = self.fl | 0b00000001
-            if comp_a > comp_b:
-                self.fl = self.fl & 0b00000010
-                self.fl = self.fl | 0b00000010
-            if comp_a < comp_b:
-                self.fl = self.fl & 0b00000100
-                self.fl = self.fl | 0b00000100
-
-        elif op == 'AND':
-            anded = (int(self.reg[arg_1], 2) & int(self.reg[arg_2])) & 0xff
-            self.reg[arg_1] = f'{anded:08b}'
-
-        elif op == 'OR':
-            ored = (int(self.reg[arg_1]) | int(self.reg[arg_2])) & 0xff
-            self.reg[arg_1] = f'{ored:08b}'
-
-        elif op == 'XOR':
-            xored = (int(self.reg[arg_1]) ^ int(self.reg[arg_2])) & 0xff
-            self.reg[arg_1] = f'{xored:08b}'
-
-        elif op == 'NOT':
-            noted = int(~self.reg[arg_1], 2) & 0xff
-            self.reg[arg_1] = f'{noted:08b}'
-
-        elif op == 'SHL':
-            shled = (int(self.reg[arg_1], 2) << int(self.reg[arg_2],2 )) & 0xff
-            self.reg[arg_1] = f'{shled:08b}'
-
-        elif op == 'SHR':
-            shred = (int(self.reg[arg_1], 2) << int(self.reg[arg_2], 2)) & 0xff
-            self.reg[arg_1] = f'{shred:08b}'
-
+    def JGT(self):
+        if self.fl & (1 << 1):
+            self.pc = int(self.reg[int(self.first(), 2)], 2)
         else:
-            raise ValueError(f"Unsupported ALU operation: {op}")
+            self.pc += 1
+
+    def JGE(self):
+        if self.fl & 1 or self.fl & (1 << 1):
+            self.pc = int(self.reg[int(self.first(), 2)], 2)
+        else:
+            self.pc += 1
+
+    def JLT(self):
+        if self.fl & (1 << 2):
+            self.pc = int(self.reg[int(self.first(), 2)], 2)
+        else:
+            self.pc += 1
+
+    def JLE(self):
+        if self.fl & 1 or self.fl & (1 << 2):
+            self.pc = int(self.reg[int(self.first(), 2)], 2)
+        else:
+            self.pc += 1
+
+    def DEC(self):
+        deced = (int(self.reg[int(self.first(), 2)], 2) - 1) & 0xff
+        self.reg[int(self.first(), 2)] = f'{deced:08b}'
+
+    def INC(self):
+        inced = (int(self.reg[int(self.first(), 2)], 2) + 1) & 0xff
+        self.reg[int(self.first(), 2)] = f'{inced:08b}'
+
+    def ADD(self):
+        added = (int(self.reg[int(self.first(), 2)], 2) + int(self.reg[int(self.second(), 2)], 2)) & 0xff
+        self.reg[int(self.first(), 2)] = f'{added:08b}'
+
+    def SUB(self):
+        subbed = (int(self.reg[int(self.first(), 2)], 2) - int(self.reg[int(self.second(), 2)], 2)) * 0xff
+        self.reg[int(self.first(), 2)] = f'{subbed:08b}'
+
+    def MUL(self):
+        mulled = (int(self.reg[int(self.first(), 2)], 2) * int(self.reg[int(self.second(), 2)], 2)) & 0xff
+        self.reg[int(self.first(), 2)] = f'{mulled:08b}'
+
+    def DIV(self):
+        dived = (int(self.reg[int(self.first(), 2)], 2) >> int(self.reg[int(self.second(), 2)], 2)) & 0xff
+        self.reg[int(self.first(), 2)] = f'{dived:08b}'
+
+    def MOD(self):
+        modded = (int(self.reg[int(self.first(), 2)], 2) % int(self.reg[int(self.second(), 2)], 2)) & 0xff
+        self.reg[int(self.first(), 2)] = f'{modded:08b}'
+
+    def CMP(self):
+        comp_a, comp_b = int(self.reg[int(self.first(), 2)], 2), int(self.reg[int(self.second(), 2)], 2)
+        if comp_a == comp_b:
+            self.fl = self.fl & 0b00000001
+            self.fl = self.fl | 0b00000001
+        if comp_a > comp_b:
+            self.fl = self.fl & 0b00000010
+            self.fl = self.fl | 0b00000010
+        if comp_a < comp_b:
+            self.fl = self.fl & 0b00000100
+            self.fl = self.fl | 0b00000100
+
+    def AND(self):
+        anded = (int(self.reg[int(self.first(), 2)], 2) & int(self.reg[int(self.second(), 2)], 2)) & 0xff
+        self.reg[int(self.first(), 2)] = f'{anded:08b}'
+
+    def OR(self):
+        ored = (int(self.reg[int(self.first(), 2)], 2) | int(self.reg[int(self.second(), 2)], 2)) & 0xff
+        self.reg[int(self.first(), 2)] = f'{ored:08b}'
+
+    def XOR(self):
+        xored = (int(self.reg[int(self.first(), 2)], 2) ^ int(self.reg[int(self.second(), 2)], 2)) & 0xff
+        self.reg[int(self.first(), 2)] = f'{xored:08b}'
+
+    def NOT(self):
+        noted = int(~int(self.reg[int(self.first(), 2)], 2), 2) & 0xff
+        self.reg[int(self.first(), 2)] = f'{noted:08b}'
+
+    def SHL(self):
+        shled = (int(self.reg[int(self.first(), 2)], 2) << int(self.reg[int(self.second(), 2)], 2)) & 0xff
+        self.reg[int(self.first(), 2)] = f'{shled:08b}'
+
+    def SHR(self):
+        shred = (int(self.reg[int(self.first(), 2)], 2) << int(self.reg[int(self.second(), 2)], 2)) & 0xff
+        self.reg[int(self.first(), 2)] = f'{shred:08b}'
 
     def trace(self):
         """
@@ -246,13 +240,14 @@ class CPU:
         from run() if you need help debugging.
         """
 
-        print(f"TRACE: pc: {self.pc}, fl: {self.fl}, ir: {self.ir}, ram: {self.ram_read(self.pc)}, "
+        print(f"TRACE: pc: {self.pc}, fl: {self.fl}, "
+              # f"ir: {self.ir}, "
+              f"ram: {self.ram_read(self.pc)}, "
               f"ram +: {self.ram_read(self.pc + 1)}, ram ++: {self.ram_read(self.pc + 2)},", end='')
 
         print('\nRegisters: ')
         for i in range(8):
             print(f"{self.reg[i]}", end=', ')
-
         print('\n\n')
 
     def ram_read(self, address):
@@ -266,26 +261,25 @@ class CPU:
     def run(self):
         """Run the CPU."""
         while True:
-            self.ir = int(self.ram_read(self.pc), 2)
-            _bytes = self.ir >> 6
-            _alu = self.ir & 0b00100000
+            ir = int(self.ram_read(self.pc), 2)
+            _bytes = ir >> 6
+            _alu = ir & 0b00100000
             alu = _alu >> 5
-            _adv_pc = self.ir & 0b00010000
+            _adv_pc = ir & 0b00010000
             adv_pc = _adv_pc >> 4
-            instruction = self.ir & 0b00001111
-            args = []
+            instruction = ir & 0b00001111
+            args = 0xf7
 
             for _ in range(_bytes):
                 self.pc += 1
-                args.append(self.ram_read(self.pc))
-            # print('b', _bytes, 'a', alu,
-            #       'ad', adv_pc, 'ins', bin(self.ir))
+                self.ram_write(args, self.ram_read(self.pc))
+                args -= 1
+
             if not adv_pc:
                 self.pc += 1
-            op = self.op_map[alu][adv_pc][instruction]
-            # print(op, args)
+
+            # print('b', _bytes, 'a', alu,
+            #       'ad', adv_pc, 'ins', bin(ir))
             # self.trace()
-            if alu:
-                self.alu(op, *args)
-            else:
-                self.not_alu(op, *args)
+
+            self.op_map[alu][adv_pc][instruction]()
