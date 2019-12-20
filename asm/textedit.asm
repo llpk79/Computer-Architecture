@@ -12,8 +12,8 @@
 ; Expected output: Press [esc] to quit.
 Start:
 
-	LDI R0,Instruct        ; address of "Hello, world!" bytes
-	LDI R1,21            ; number of bytes to print
+	LDI R0,Instruct      ; address of "Hello, world!" bytes
+	LDI R1,22            ; number of bytes to print
 	LDI R2,PrintStr      ; address of PrintStr
 	CALL R2              ; call PrintStr
 	RET                  ; halt
@@ -50,7 +50,8 @@ PrintStrEnd:
 Instruct:
 
 	ds Press [esc] to quit.
-	db 0x0a             ; newline
+	db 0x0a       ; newline
+	db 0x0a       ; newline
 
 
 Keyboard:

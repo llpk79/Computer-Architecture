@@ -34,8 +34,8 @@ PrintLine:
     PRA R3
     LDI R3,0xa0
     LD R1,R3
-    LDI R3,2
-    MUL R1,R3
+    LDI R3,1
+    SHL R1,R3
     DEC R0
     LDI R3,Printline
     JMP R3
