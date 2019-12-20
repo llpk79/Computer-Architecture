@@ -57,7 +57,8 @@ class CPU:
                                0b1101: self.SHR,
                                0b0001: self.SUB,
                                0b1011: self.XOR,
-                               }},
+                               },
+                           1: None},
                        0: {1: {0b0000: self.CALL,
                                0b0010: self.INT,
                                0b0011: self.IRET,
@@ -312,10 +313,13 @@ class CPU:
         """
         comp_a, comp_b = int(self.reg[int(self.first(), 2)], 2), int(self.reg[int(self.second(), 2)], 2)
         if comp_a == comp_b:
+            self.fl = self.fl & 0b00000001
             self.fl = self.fl | 0b00000001
         if comp_a > comp_b:
+            self.fl = self.fl & 0b00000010
             self.fl = self.fl | 0b00000010
         if comp_a < comp_b:
+            self.fl = self.fl & 0b00000100
             self.fl = self.fl | 0b00000100
 
     def trace(self):
@@ -385,7 +389,7 @@ class CPU:
                 adv_pc = (instruction & 0b00010000) >> 4  # 1 if instruction advances pc.
                 op_code = instruction & 0b00001111
 
-                # Get required number of bytes from ram.
+                # Get required number of bytes from memory and load register vectors.
                 for _ in range(_bytes):
                     self.pc += 1
                     self.ram_write(args, self.ram_read(self.pc))
@@ -395,7 +399,12 @@ class CPU:
                 if not adv_pc:
                     self.pc += 1
 
+                # Print debugging info.
                 # self.trace()
 
                 # Call the operation from the op_map.
-                self.op_map[alu][adv_pc][op_code]()
+                if op_code in self.op_map[alu][adv_pc]:
+                    self.op_map[alu][adv_pc][op_code]()
+                else:
+                    print(f'Unknown instruction at address {self.pc}')
+                    sys.exit(-1)
