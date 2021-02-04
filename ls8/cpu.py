@@ -109,7 +109,8 @@ class CPU:
 
     def PRN(self):
         """Print a number."""
-        print(int(self.reg[int(self.first(), 2)], 2), end='', flush=True)
+        number = self.reg[int(self.first(), 2)]
+        print(int(number, 2), end='', flush=True)
 
     def PRA(self):
         """Print a character."""
@@ -156,14 +157,17 @@ class CPU:
         self.ram[int(self.reg[int(self.first(), 2)], 2)] = self.reg[int(self.second(), 2)]
 
     def INT(self):
-        """Interrupt program and jump to iterrupt handler.
+        """Interrupt program and jump to interrupt handler.
 
         Reset IS bits.
         Halt interrupts.
         Store all but 8th register in stack, followed by fl and current pc.
         Move pc to interrupt handler address.
         """
-        self.reg[self.IS] = '00000000'
+        interrupt = int(self.first(), 2)
+        # Clear the bit of interrupt being handled while preserving other
+        # potentially set interrupts.
+        self.reg[self.IS] = f'{int(self.reg[self.IS], 2) & 7 - ((0xff - interrupt) + 1):08b}'
         self.interrupts = False
         self.reg[self.SP] -= 1
         self.ram[self.reg[self.SP]] = self.pc
@@ -173,7 +177,7 @@ class CPU:
             self.reg[self.SP] -= 1
             self.ram[self.reg[self.SP]] = self.reg[i]
             self.reg[i] = '00000000'
-        self.pc = int(self.ram[int(self.first(), 2)], 2)
+        self.pc = int(self.ram[interrupt], 2)
 
     def IRET(self):
         """Return from interrupt.
@@ -353,7 +357,7 @@ class CPU:
 
             # Continue until HLT reached.
             while True:
-                args = 0xff  # ram[args] and ram[args + 1] hold active register numbers arg_1 and arg_2.
+                args = 0xff  # ram[args] and ram[args + 1] hold values for registers arg_1 and arg_2.
 
                 if self.interrupts:
                     # Check time interrupt.
@@ -366,11 +370,10 @@ class CPU:
                     # Check keyboard interrupt.
                     key = nbc.get_data()
                     if key:
-                        self.ram_write(self.KEY, f'{ord(key):08b}')
-                        self.reg[self.IS] = '00000010'
-
                         if key == '\x1b':  # x1b is ESC
                             self.HLT()
+                        self.ram_write(self.KEY, f'{ord(key):08b}')
+                        self.reg[self.IS] = '00000010'
 
                     # Check if any interrupts have been triggered.
                     mask = int(self.reg[self.IM], 2) & int(self.reg[self.IS], 2)
@@ -406,5 +409,5 @@ class CPU:
                 if op_code in self.op_map[alu][adv_pc]:
                     self.op_map[alu][adv_pc][op_code]()
                 else:
-                    print(f'Unknown instruction at address {self.pc}')
+                    print(f'Unknown instruction {op_code} at address {self.pc}')
                     sys.exit(-1)
